@@ -6,14 +6,8 @@
     #define M_PI 3.14159265358979323846
 #endif
 
-#define WIDTH 900
-#define HEIGHT 600
-
 #define PLAYER_FOV 80
 
-#define COLOR_WHITE 0xFFFFFFFF
-#define PLAYER_COLOR 0xFF00FF00
-#define WALL_COLOR 0xFFAAAAAA
 #define CELL_SIZE 50
 
 #define MAP_WIDTH 5
@@ -22,15 +16,12 @@
 #define RAY_STEP_SIZE 0.5 
 #define RENDER_DISTANCE 1000
 
-#define SCENE_WIDTH MAP_WIDTH*CELL_SIZE
-#define SCENE_HEIGHT MAP_HEIGHT*CELL_SIZE
-
 int map[MAP_HEIGHT][MAP_WIDTH] = {
-    {1, 1, 1, 1, 1},
+    {1, 2, 1, 3, 1},
+    {2, 0, 0, 0, 4},
     {1, 0, 0, 0, 1},
-    {1, 0, 0, 0, 1},
-    {1, 0, 0, 0, 1},
-    {1, 1, 1, 1, 1},
+    {3, 0, 0, 0, 2},
+    {1, 4, 1, 2, 1},
 };
 
 typedef struct {
@@ -41,12 +32,17 @@ typedef struct {
 
 Player player = { .x = 100.0, .y = 100.0, .angle = 0.0 };
 
-void drawPlayer(SDL_Surface* surface, Player p) {
-    SDL_Rect player_rect = { .x = (int)p.x, .y = (int)p.y, .w = 10, .h = 10 };
-    SDL_FillRect(surface, &player_rect, PLAYER_COLOR);
+Uint32 get_wall_color(int type) {
+    switch(type) {
+        case 1: return 0xFFE63946;
+        case 2: return 0xFF2A9D8F;
+        case 3: return 0xFF457B9D;
+        case 4: return 0xFFF4A261;
+        default: return 0xFFAAAAAA;
+    }
 }
 
-double get_distance(Player p, double angle) {
+double get_distance(Player p, double angle, int* hit_type) {
     double ray_x = p.x;
     double ray_y = p.y;
     double cos_a = cos(angle);
@@ -65,7 +61,8 @@ double get_distance(Player p, double angle) {
         if (cell_x < 0 || cell_x >= MAP_WIDTH || cell_y < 0 || cell_y >= MAP_HEIGHT) 
             return -1;
 
-        if (map[cell_y][cell_x] == 1) {
+        if (map[cell_y][cell_x] > 0) {
+            *hit_type = map[cell_y][cell_x];
             return ray_distance;
         }
     }
@@ -73,23 +70,28 @@ double get_distance(Player p, double angle) {
 }
 
 void draw_fov(SDL_Surface* surface, Player p) {
+    int width = surface->w;
+    int height = surface->h;
+    
     double fov_rad = PLAYER_FOV * M_PI / 180.0;
     double start_angle = p.angle - (fov_rad / 2.0);
 
-    for (int x = 0; x < WIDTH; x++) {
-        double current_angle = start_angle + (x / (double)WIDTH) * fov_rad;
-        double dist = get_distance(p, current_angle);
+    for (int x = 0; x < width; x++) {
+        double current_angle = start_angle + (x / (double)width) * fov_rad;
+        
+        int hit_type = 0;
+        double dist = get_distance(p, current_angle, &hit_type);
 
         if (dist > 0) {
             dist *= cos(current_angle - p.angle);
 
-            int wall_height = (CELL_SIZE * HEIGHT) / dist;
-            if (wall_height > HEIGHT) wall_height = HEIGHT;
+            int wall_height = (CELL_SIZE * height) / dist;
+            if (wall_height > height) wall_height = height;
 
-            int draw_start = (HEIGHT / 2) - (wall_height / 2);
+            int draw_start = (height / 2) - (wall_height / 2);
             
             SDL_Rect wall_slice = { .x = x, .y = draw_start, .w = 1, .h = wall_height };
-            SDL_FillRect(surface, &wall_slice, WALL_COLOR);
+            SDL_FillRect(surface, &wall_slice, get_wall_color(hit_type));
         }
     }
 }
@@ -98,7 +100,7 @@ int main(int argc, char* argv[]) {
     SDL_Init(SDL_INIT_VIDEO);
 
     SDL_Window* window = SDL_CreateWindow("Raycasting Engine",
-        SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, WIDTH, HEIGHT, 0);
+        SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 900, 600, SDL_WINDOW_RESIZABLE);
 
     SDL_Surface* surface = SDL_GetWindowSurface(window);
     bool running = true;
@@ -108,6 +110,11 @@ int main(int argc, char* argv[]) {
         while (SDL_PollEvent(&event)) {
             if (event.type == SDL_QUIT) {
                 running = false;
+            } else if (event.type == SDL_WINDOWEVENT) {
+                if (event.window.event == SDL_WINDOWEVENT_RESIZED || 
+                    event.window.event == SDL_WINDOWEVENT_SIZE_CHANGED) {
+                    surface = SDL_GetWindowSurface(window);
+                }
             }
         }
 
@@ -124,9 +131,7 @@ int main(int argc, char* argv[]) {
         if (state[SDL_SCANCODE_D]) player.angle += 0.05;
 
         SDL_FillRect(surface, NULL, 0x00000000);
-
         draw_fov(surface, player);
-        drawPlayer(surface, player);
 
         SDL_UpdateWindowSurface(window);
         SDL_Delay(16);
