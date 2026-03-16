@@ -6,7 +6,7 @@
 
 #define WIDTH 900
 #define HEIGHT 600
-#define MAP_SIZE 12
+#define MAP_SIZE 14
 
 typedef struct {
     double x, y;
