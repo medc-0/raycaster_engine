@@ -14,4 +14,8 @@ typedef struct {
     double planeX, planeY;
 } Player;
 
+extern int worldMap[MAP_SIZE][MAP_SIZE];
+
+void render_frame(SDL_Surface *surface, Player *player);
+void handle_input(Player *player, const Uint8 *keys, double frameTime);
 Uint32 get_color(int texNum, int side);
